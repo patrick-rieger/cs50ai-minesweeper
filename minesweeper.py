@@ -194,7 +194,66 @@ class MinesweeperAI():
             5) add any new sentences to the AI's knowledge base
                if they can be inferred from existing knowledge
         """
-        raise NotImplementedError
+        def mark_mine_or_safe():
+            # Mark any additional cells as safe or as mines
+            # if it can be concluded based on the AI's knowledge base
+            copy_knowledge = self.knowledge.copy()
+            while copy_knowledge:
+                sentence = copy_knowledge.pop()
+                for safe_cell in sentence.known_safes().copy():
+                    self.mark_safe(safe_cell)
+                for mine_cell in sentence.known_mines().copy():
+                    self.mark_mine(mine_cell)
+                # The for need to be a copy of the set returned from 
+                # know_safes or known_mines because it'll be modified
+
+        # 1) Mark the cell as one of the moves made in the game
+        self.moves_made.add(cell)
+
+        # 2) Mark the cell as a safe cell, 
+        # updating any sentences that contain the cell as well
+        self.mark_safe(cell)
+
+        # 3) Add a new sentence to the AI’s knowledge base, based on the value of cell and count, 
+        # to indicate that count of the cell’s neighbors are mines. Only include cells 
+        # whose state is still undetermined in the sentence
+        i, j = cell
+        cells = set()
+        new_count = count
+        for x in range(-1, 2):
+            for y in range(-1, 2):
+                if 0 <= i+x < self.height and 0 <= j+y < self.width:
+                    # for all cell’s neighbors
+                    nearby_cell = (i+x, j+y)
+                    if nearby_cell not in (self.safes | self.moves_made) and nearby_cell != cell:
+                        if nearby_cell in self.mines:
+                            new_count -= 1
+                        else:
+                            cells.add(nearby_cell)
+        sentence = Sentence(cells, new_count)
+        if sentence not in self.knowledge:
+            self.knowledge.append(sentence)
+
+        # 4
+        mark_mine_or_safe()
+
+        self.knowledge = [sentence for sentence in self.knowledge if len(sentence.cells) > 0]
+        # Remove all sentences from the knowledge base that have 0 cells
+
+        # 5) Any time we have two sentences set1 = count1 and set2 = count2 where 
+        # set1 is a subset of set2, then we can construct the new sentence:
+        # set2 - set1 = count2 - count1
+        copy_knowledge = self.knowledge.copy()
+        while copy_knowledge:
+            sentence1 = copy_knowledge.pop()
+            set1, count1 = sentence1.cells, sentence1.count
+            for sentence2 in copy_knowledge:
+                set2, count2 = sentence2.cells, sentence2.count
+                if set1.issubset(set2):
+                    s = Sentence(set2 - set1, count2 - count1)
+                    if s not in self.knowledge:
+                        self.knowledge.append(s)
+            mark_mine_or_safe() # Maybe is possible to mark new mines or safe cells
 
     def make_safe_move(self):
         """
